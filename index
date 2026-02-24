@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fast Long Exposure Processor</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .canvas-container {
+            max-width: 100%;
+            overflow: auto;
+            border-radius: 12px;
+            box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1);
+        }
+        canvas {
+            display: block;
+            margin: 0 auto;
+            max-width: 100%;
+            height: auto;
+            background-color: #050505;
+        }
+        /* Custom scrollbar for canvas overflow */
+        .canvas-container::-webkit-scrollbar { height: 8px; }
+        .canvas-container::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 8px; }
+        .canvas-container::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 8px; }
+    </style>
+</head>
+<body class="bg-slate-100 min-h-screen text-slate-900 font-sans p-4 md:p-8">
+
+    <div class="max-w-6xl mx-auto bg-white rounded-3xl shadow-xl overflow-hidden border border-slate-200">
+        <!-- Header -->
+        <div class="bg-gradient-to-r from-blue-700 to-indigo-800 p-6 md:p-8 text-white flex justify-between items-center">
+            <div>
+                <h1 class="text-3xl font-extrabold tracking-tight">Long Exposure Engine <span class="text-blue-300 text-sm align-top">v2.0</span></h1>
+                <p class="mt-2 text-indigo-100 font-medium">Optimized for Speed and Large Videos</p>
+            </div>
+        </div>
+
+        <div class="p-6 md:p-8 space-y-8">
+            <!-- Controls Layout -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                
+                <!-- 1. Media Source -->
+                <div class="space-y-3">
+                    <label class="flex items-center space-x-2 text-xs font-bold text-slate-500 uppercase tracking-widest">
+                        <span class="bg-slate-200 text-slate-700 w-5 h-5 flex items-center justify-center rounded-full text-[10px]">1</span>
+                        <span>Video Source</span>
+                    </label>
+                    <div class="group relative">
+                        <input type="file" id="videoInput" accept="video/*" 
+                               class="block w-full text-sm text-slate-500
+                                      file:mr-4 file:py-3 file:px-4
+                                      file:rounded-xl file:border-0
+                                      file:text-sm file:font-bold
+                                      file:bg-blue-50 file:text-blue-700
+                                      hover:file:bg-blue-100
+                                      cursor-pointer border-2 border-dashed border-slate-200 rounded-2xl p-3 transition-all hover:border-blue-400">
+                    </div>
+                    <div id="videoInfo" class="hidden text-xs text-slate-500 font-mono bg-slate-50 p-3 rounded-lg border border-slate-200 shadow-inner"></div>
+                </div>
+
+                <!-- 2. Performance Settings -->
+                <div class="space-y-3">
+                    <label class="flex items-center space-x-2 text-xs font-bold text-slate-500 uppercase tracking-widest">
+                        <span class="bg-slate-200 text-slate-700 w-5 h-5 flex items-center justify-center rounded-full text-[10px]">2</span>
+                        <span>Quality & Speed</span>
+                    </label>
+                    <div class="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-4 shadow-sm">
+                        <!-- Resolution Dropdown -->
+                        <div>
+                            <label class="block text-xs font-bold text-slate-600 mb-1">Processing Resolution</label>
+                            <select id="resMode" class="w-full bg-white border border-slate-300 rounded-lg p-2.5 text-sm font-semibold focus:ring-2 focus:ring-blue-500 outline-none transition-all">
+                                <option value="720">720p (Very Fast)</option>
+                                <option value="1080" selected>1080p HD (Balanced)</option>
+                                <option value="original">Original Size (Slowest)</option>
+                            </select>
+                        </div>
+                        <!-- Frame Count Slider -->
+                        <div>
+                            <div class="flex justify-between items-center mb-1">
+                                <span class="text-xs font-bold text-slate-600">Frames to Sample</span>
+                                <span id="framesLabel" class="text-sm font-black text-blue-600">60</span>
+                            </div>
+                            <input type="range" id="frameSlider" min="10" max="300" step="10" value="60"
+                                   class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 3. Blend & Process -->
+                <div class="space-y-3">
+                    <label class="flex items-center space-x-2 text-xs font-bold text-slate-500 uppercase tracking-widest">
+                        <span class="bg-slate-200 text-slate-700 w-5 h-5 flex items-center justify-center rounded-full text-[10px]">3</span>
+                        <span>Exposure & Render</span>
+                    </label>
+                    <div class="flex flex-col h-full space-y-3">
+                        <select id="blendMode" class="w-full bg-white border border-slate-300 rounded-lg p-2.5 text-sm font-semibold focus:ring-2 focus:ring-blue-500 outline-none shadow-sm">
+                            <option value="average">Standard Average (Motion Blur)</option>
+                            <option value="brightest">Brightest Pixel (Light Trails)</option>
+                            <option value="additive">Additive Build (Ethereal)</option>
+                            <option value="darkest">Darkest Pixel (Object Removal)</option>
+                            <option value="difference">Motion Difference (Abstract)</option>
+                        </select>
+                        <button id="processBtn" disabled 
+                                class="w-full flex-grow py-3 bg-blue-600 text-white rounded-xl font-black text-lg shadow-lg hover:bg-blue-700 hover:shadow-blue-200 active:scale-[0.98] disabled:bg-slate-200 disabled:text-slate-400 disabled:shadow-none disabled:cursor-not-allowed transition-all">
+                            GENERATE
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Progress Bar UI -->
+            <div id="progressContainer" class="hidden space-y-2 p-4 bg-blue-50 border border-blue-100 rounded-xl">
+                <div class="flex justify-between text-xs font-bold text-blue-800 uppercase tracking-wider">
+                    <span id="progressText">Processing...</span>
+                    <span id="progressPercent">0%</span>
+                </div>
+                <div class="w-full bg-blue-200 rounded-full h-2.5">
+                    <div id="progressBar" class="bg-blue-600 h-2.5 rounded-full transition-all duration-200" style="width: 0%"></div>
+                </div>
+            </div>
+
+            <!-- Output Section -->
+            <div id="outputContainer" class="hidden space-y-4 pt-4 border-t border-slate-200">
+                <div class="flex flex-col sm:flex-row justify-between items-center gap-4">
+                    <h2 class="text-xl font-black text-slate-800 tracking-tight">Final Output</h2>
+                    <button id="downloadBtn" class="w-full sm:w-auto flex items-center justify-center space-x-2 bg-slate-800 text-white px-6 py-2.5 rounded-lg font-bold hover:bg-slate-900 shadow-lg active:scale-95 transition-all">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                        </svg>
+                        <span>Download High-Res PNG</span>
+                    </button>
+                </div>
+                <div class="canvas-container bg-slate-900 flex justify-center items-center min-h-[400px]">
+                    <canvas id="mainCanvas"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <video id="sourceVideo" class="hidden" muted playsinline></video>
+    <canvas id="bufferCanvas" class="hidden"></canvas>
+
+    <script>
+        const videoInput = document.getElementById('videoInput');
+        const processBtn = document.getElementById('processBtn');
+        const downloadBtn = document.getElementById('downloadBtn');
+        const frameSlider = document.getElementById('frameSlider');
+        const blendMode = document.getElementById('blendMode');
+        const resMode = document.getElementById('resMode');
+        const framesLabel = document.getElementById('framesLabel');
+        const sourceVideo = document.getElementById('sourceVideo');
+        const mainCanvas = document.getElementById('mainCanvas');
+        const bufferCanvas = document.getElementById('bufferCanvas');
+        const videoInfo = document.getElementById('videoInfo');
+        const outputContainer = document.getElementById('outputContainer');
+        const progressContainer = document.getElementById('progressContainer');
+        const progressBar = document.getElementById('progressBar');
+        const progressPercent = document.getElementById('progressPercent');
+        const progressText = document.getElementById('progressText');
+
+        let videoLoaded = false;
+
+        // UI Updates
+        frameSlider.addEventListener('input', (e) => {
+            framesLabel.textContent = e.target.value;
+        });
+
+        // Load Video
+        videoInput.addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const url = URL.createObjectURL(file);
+            sourceVideo.src = url;
+            sourceVideo.load();
+
+            sourceVideo.onloadedmetadata = () => {
+                videoLoaded = true;
+                processBtn.disabled = false;
+                videoInfo.innerHTML = `<strong>File:</strong> ${file.name}<br><strong>Original:</strong> ${sourceVideo.videoWidth}x${sourceVideo.videoHeight}<br><strong>Length:</strong> ${sourceVideo.duration.toFixed(1)}s`;
+                videoInfo.classList.remove('hidden');
+            };
+        });
+
+        // Async Yield Function (Prevents Browser Freezing)
+        const yieldToMain = () => new Promise(resolve => setTimeout(resolve, 0));
+
+        processBtn.addEventListener('click', async () => {
+            if (!videoLoaded) return;
+
+            // Lock UI & Reset State
+            processBtn.disabled = true;
+            outputContainer.classList.add('hidden');
+            progressContainer.classList.remove('hidden');
+            progressBar.style.width = '0%';
+            progressPercent.textContent = '0%';
+            progressText.textContent = 'Preparing Canvas...';
+            
+            await yieldToMain(); // Allow UI to update before heavy lifting
+
+            let vWidth = sourceVideo.videoWidth;
+            let vHeight = sourceVideo.videoHeight;
+            const mode = blendMode.value;
+            const targetRes = resMode.value;
+
+            // Optimization 1: Resolution Scaling
+            if (targetRes !== 'original') {
+                const maxDim = parseInt(targetRes); // 720 or 1080
+                // Use height as limiting factor standard
+                if (vHeight > maxDim) {
+                    const ratio = maxDim / vHeight;
+                    vHeight = maxDim;
+                    vWidth = Math.floor(vWidth * ratio);
+                }
+            }
+            
+            mainCanvas.width = vWidth;
+            mainCanvas.height = vHeight;
+            bufferCanvas.width = vWidth;
+            bufferCanvas.height = vHeight;
+
+            const ctx = mainCanvas.getContext('2d', { alpha: false });
+            const bCtx = bufferCanvas.getContext('2d', { willReadFrequently: true });
+            
+            const duration = sourceVideo.duration;
+            
+            // Optimization 2: Absolute Frame Counts vs Percentages
+            const framesToProcess = parseInt(frameSlider.value);
+            const step = (duration - 0.1) / Math.max(1, (framesToProcess - 1));
+
+            const pixelDataSize = vWidth * vHeight * 4;
+            const accumulator = new Float32Array(pixelDataSize);
+            let referenceFrame = null;
+            let framesCounted = 0;
+
+            // Pre-fill arrays based on mode logic
+            if (mode === 'darkest') {
+                accumulator.fill(255);
+            } else {
+                accumulator.fill(0);
+            }
+
+            // Main Extraction Loop
+            for (let i = 0; i < framesToProcess; i++) {
+                const timestamp = i * step;
+                sourceVideo.currentTime = timestamp;
+                
+                // Wait for video frame to seek
+                await new Promise(resolve => {
+                    const onSeeked = () => {
+                        sourceVideo.removeEventListener('seeked', onSeeked);
+                        resolve();
+                    };
+                    sourceVideo.addEventListener('seeked', onSeeked);
+                });
+
+                bCtx.drawImage(sourceVideo, 0, 0, vWidth, vHeight);
+                const frame = bCtx.getImageData(0, 0, vWidth, vHeight).data;
+
+                if (i === 0 && mode === 'difference') {
+                    referenceFrame = new Uint8ClampedArray(frame);
+                }
+
+                // Optimization 3: Loop Unrolling and Branch Hoisting
+                // By pulling the 'if' statement OUTSIDE the pixel loop, we save millions of evaluations per frame.
+                // We also replace function calls like Math.max() with direct logic statements.
+                
+                if (mode === 'average' || mode === 'additive') {
+                    for (let j = 0; j < pixelDataSize; j += 4) {
+                        accumulator[j] += frame[j];
+                        accumulator[j+1] += frame[j+1];
+                        accumulator[j+2] += frame[j+2];
+                    }
+                } 
+                else if (mode === 'brightest') {
+                    for (let j = 0; j < pixelDataSize; j += 4) {
+                        if (frame[j] > accumulator[j]) accumulator[j] = frame[j];
+                        if (frame[j+1] > accumulator[j+1]) accumulator[j+1] = frame[j+1];
+                        if (frame[j+2] > accumulator[j+2]) accumulator[j+2] = frame[j+2];
+                    }
+                }
+                else if (mode === 'darkest') {
+                    for (let j = 0; j < pixelDataSize; j += 4) {
+                        if (frame[j] < accumulator[j]) accumulator[j] = frame[j];
+                        if (frame[j+1] < accumulator[j+1]) accumulator[j+1] = frame[j+1];
+                        if (frame[j+2] < accumulator[j+2]) accumulator[j+2] = frame[j+2];
+                    }
+                }
+                else if (mode === 'difference') {
+                    for (let j = 0; j < pixelDataSize; j += 4) {
+                        // Manual absolute difference without Math.abs for speed
+                        let r = frame[j] - referenceFrame[j];
+                        let g = frame[j+1] - referenceFrame[j+1];
+                        let b = frame[j+2] - referenceFrame[j+2];
+                        
+                        r = r < 0 ? -r : r;
+                        g = g < 0 ? -g : g;
+                        b = b < 0 ? -b : b;
+
+                        if (r > accumulator[j]) accumulator[j] = r;
+                        if (g > accumulator[j+1]) accumulator[j+1] = g;
+                        if (b > accumulator[j+2]) accumulator[j+2] = b;
+                    }
+                }
+
+                framesCounted++;
+
+                // Optimization 4: Update UI Progress Bar asynchronously
+                if (i % 2 === 0 || i === framesToProcess - 1) {
+                    const pct = Math.round(((i + 1) / framesToProcess) * 100);
+                    progressBar.style.width = `${pct}%`;
+                    progressPercent.textContent = `${pct}%`;
+                    progressText.textContent = `Processing Frame ${i + 1} of ${framesToProcess}...`;
+                    await yieldToMain(); // Keep browser from thinking tab has crashed
+                }
+            }
+
+            progressText.textContent = "Rendering Final Image...";
+            await yieldToMain();
+
+            // Final Image Construction
+            const finalImageData = ctx.createImageData(vWidth, vHeight);
+            
+            // Unroll final math application
+            if (mode === 'average') {
+                for (let j = 0; j < pixelDataSize; j += 4) {
+                    finalImageData.data[j] = accumulator[j] / framesCounted;
+                    finalImageData.data[j+1] = accumulator[j+1] / framesCounted;
+                    finalImageData.data[j+2] = accumulator[j+2] / framesCounted;
+                    finalImageData.data[j+3] = 255;
+                }
+            } else if (mode === 'additive') {
+                for (let j = 0; j < pixelDataSize; j += 4) {
+                    finalImageData.data[j] = accumulator[j] > 255 ? 255 : accumulator[j];
+                    finalImageData.data[j+1] = accumulator[j+1] > 255 ? 255 : accumulator[j+1];
+                    finalImageData.data[j+2] = accumulator[j+2] > 255 ? 255 : accumulator[j+2];
+                    finalImageData.data[j+3] = 255;
+                }
+            } else {
+                for (let j = 0; j < pixelDataSize; j += 4) {
+                    finalImageData.data[j] = accumulator[j];
+                    finalImageData.data[j+1] = accumulator[j+1];
+                    finalImageData.data[j+2] = accumulator[j+2];
+                    finalImageData.data[j+3] = 255;
+                }
+            }
+
+            ctx.putImageData(finalImageData, 0, 0);
+
+            // Complete UI
+            progressContainer.classList.add('hidden');
+            outputContainer.classList.remove('hidden');
+            processBtn.disabled = false;
+        });
+
+        // Download PNG Function
+        downloadBtn.addEventListener('click', () => {
+            const link = document.createElement('a');
+            link.download = `long-exposure-${blendMode.value}-${mainCanvas.width}x${mainCanvas.height}.png`;
+            link.href = mainCanvas.toDataURL('image/png', 1.0);
+            link.click();
+        });
+
+    </script>
+</body>
+</html>
